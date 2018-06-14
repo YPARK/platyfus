@@ -1,0 +1,83 @@
+---
+title: "Pleiotropic Association Typing by Factrozation of Underlying Summary statsitics"
+author: "Yongjin Park"
+date: "`r Sys.Date()`"
+bibliography: pleiotropy.bib
+csl: nature.csl
+---
+
+# Methods
+
+## Overview of PLATYFUS pipeline
+
+In statistical genomics analysis, multivariate regression analysis and
+matrix factorization are routinely used to explore underlying
+structure of a high-dimensional data matrix measured across multiple
+individuals and samples.
+
+We implement equivalent version of supervised and unsupervised
+learning operations to dissect complexity of GWAS summary statistics
+in [zQTL](https://github.com/YPARK/zqtl) package.
+
+_Matrix factorization_
+
+
+
+$Y = UV$
+
+
+$Z = X^{\top}Y / \sqrt{n} = X^{\top} UV / \sqrt{n}$
+
+
+_Factored regression_
+
+
+## Identification and adjustment of non-genetic confounder effects
+
+
+
+
+## Factored regression
+
+
+## GWAS data preparation
+
+### Preparation of reference genotype matrices
+
+[@The_1000_Genomes_Project_Consortium2015-jd]
+
+[@Huang2015-bg]
+
+
+### Standardization of GWAS summary statistics
+
+As pointed out in the previous research [@Finucane2015-fu],
+statistical inference based on summary statistics may be influenced by
+genetic markers associated with unusually large effect sizes.  When
+the underlying distribution of observed statistics substantially
+deviates from a theoretical distribution such as multivariate
+Gaussian, inflation of parametric inference was observed.  To ensure
+that z-score matrix concatenated from multiple traits behave
+similarly, we standardized the observed GWAS matrix within each LD
+block by removing bias (mean $\mu$) and rescaling (variance $\tau$).
+We estimate these parameters considering the following generative
+model:
+
+$\mathbf{z} \sim \mathcal{N}\!\left(R (\mu I), \tau R\right)$
+
+where SNP-SNP covariance matrix $R = V^{\top} D^{2} V$ can be
+calculated from singular value decomposition of the scaled genotype matrix
+$X/\sqrt{n} = UDV^{\top}$ with rank $K$.  Maximum likelihood estimate
+can be derived analytically.
+We first estimate the mean $\hat{\mu}=(\mathbf{z}^{\top}I_{p}) / (I^{\top} R I_{p})$, and plugging in this, 
+we estimate the variance $\hat{\tau} = |\mathbf{y} - \mu \mathbf{x}|^{2} /
+(K - 1)$ where $\mathbf{y}\equiv D^{-1} V^{\top}\mathbf{z}$ and
+$\mathbf{x} \equiv D V^{\top} I$.  For each trait $t$, we estimate 
+$\mu_{t}$ and $\tau_{t}$, then standardize the z-scores by
+$\mathbf{z}_{t} \gets (\mathbf{z}_{t} - \mu_{t} RI)/\sqrt{\tau_{t}}$.
+
+
+## Simulation
+
+
+# References
