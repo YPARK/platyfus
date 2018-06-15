@@ -76,6 +76,16 @@ $\mathbf{x} \equiv D V^{\top} I$.  For each trait $t$, we estimate
 $\mu_{t}$ and $\tau_{t}$, then standardize the z-scores by
 $\mathbf{z}_{t} \gets (\mathbf{z}_{t} - \mu_{t} RI)/\sqrt{\tau_{t}}$.
 
+### Genetic correlation between the SNP factor and observed z-scores
+
+To test purity of multivariate SNP factors, we calculate genetic
+correlation between the estimated SNP factor $\boldsymbol{\theta}$ and
+the z-score vector $\mathbf{z}$ across different traits, taking into
+accounts of LD covariance matrix $R$:
+
+$T_{\theta}(\mathbf{z}) \equiv \mathbf{z}^{\top}\boldsymbol{\theta} / \sqrt{\boldsymbol{\theta}^{\top}R\boldsymbol{\theta}}$
+
+
 
 ## Simulation
 

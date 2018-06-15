@@ -341,6 +341,11 @@ $(document).ready(function () {
 <p><span class="math inline">\(\mathbf{z} \sim \mathcal{N}\!\left(R (\mu I), \tau R\right)\)</span></p>
 <p>where SNP-SNP covariance matrix <span class="math inline">\(R = V^{\top} D^{2} V\)</span> can be calculated from singular value decomposition of the scaled genotype matrix <span class="math inline">\(X/\sqrt{n} = UDV^{\top}\)</span> with rank <span class="math inline">\(K\)</span>. Maximum likelihood estimate can be derived analytically. We first estimate the mean <span class="math inline">\(\hat{\mu}=(\mathbf{z}^{\top}I_{p}) / (I^{\top} R I_{p})\)</span>, and plugging in this, we estimate the variance <span class="math inline">\(\hat{\tau} = |\mathbf{y} - \mu \mathbf{x}|^{2} / (K - 1)\)</span> where <span class="math inline">\(\mathbf{y}\equiv D^{-1} V^{\top}\mathbf{z}\)</span> and <span class="math inline">\(\mathbf{x} \equiv D V^{\top} I\)</span>. For each trait <span class="math inline">\(t\)</span>, we estimate <span class="math inline">\(\mu_{t}\)</span> and <span class="math inline">\(\tau_{t}\)</span>, then standardize the z-scores by <span class="math inline">\(\mathbf{z}_{t} \gets (\mathbf{z}_{t} - \mu_{t} RI)/\sqrt{\tau_{t}}\)</span>.</p>
 </section>
+<section id="genetic-correlation-between-the-snp-factor-and-observed-z-scores" class="level3">
+<h3>Genetic correlation between the SNP factor and observed z-scores</h3>
+<p>To test purity of multivariate SNP factors, we calculate genetic correlation between the estimated SNP factor <span class="math inline">\(\boldsymbol{\theta}\)</span> and the z-score vector <span class="math inline">\(\mathbf{z}\)</span> across different traits, taking into accounts of LD covariance matrix <span class="math inline">\(R\)</span>:</p>
+<p><span class="math inline">\(T_{\theta}(\mathbf{z}) \equiv \mathbf{z}^{\top}\boldsymbol{\theta} / \sqrt{\boldsymbol{\theta}^{\top}R\boldsymbol{\theta}}\)</span></p>
+</section>
 </section>
 <section id="simulation" class="level2">
 <h2>Simulation</h2>
