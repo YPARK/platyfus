@@ -1,0 +1,214 @@
+---
+title: Results on Biobank Japan
+author: Yongjin Park
+theme: jekyll-theme-minimal
+date: "`r Sys.Date()`"
+bibliography: "pleiotropy.bib"
+---
+
+Summary statistics data can be downloaded from [JENGER](http://jenger.riken.jp/en/result).
+
+```{r, results='hide', include=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(ggrepel)
+library(tidyr)
+library(grid)
+library(gridExtra)
+source('Util.R')
+source('Util-Figure.R')
+
+trait.code.file <- '../bbj-fqtl/summary_code.txt'
+stat.file <- '../bbj-fqtl/result/20180613/fgwas-50-09.txt.gz'
+trait.file <- '../bbj-fqtl/result/20180613/cluster/fgwas-50-09.trait.txt.gz'
+clust.file <- '../bbj-fqtl/result/20180613/cluster/fgwas-50-09.clust.txt.gz'
+snp.file <- '../bbj-fqtl/result/20180613/cluster/fgwas-50-09.snp.txt.gz'
+
+trait.code <- read_tsv(trait.code.file)
+stat.tab <- read_tsv(stat.file)
+trait.tab <- read_tsv(trait.file)
+clust.tab <- read_tsv(clust.file)
+snp.tab <- read_tsv(snp.file)
+
+snp.stat <- snp.tab %>%
+    mutate(col = ld.idx %&&% '_' %&&% factor) %>%
+    group_by(col, cluster) %>%
+    summarize(n.snps = n())
+
+ld.tab <- read_tsv('ASN-LD.bed', skip = 1,
+                   col_names = c('chr', 'LB', 'UB'),
+                   col_types = 'cii')
+
+ld.tab.auto <- ld.tab %>%
+    filter(chr %in% ('chr' %&&% 1:22)) %>%
+    mutate(chr = gsub(chr, pattern = 'chr', replacement = '')) %>%
+    mutate(chr = as.integer(chr))
+
+len.mb <- stat.tab %>%
+    select(ld.idx, LB, UB) %>%
+    unique() %>%
+    mutate(len = UB - LB) %>%
+    summarize(len = sum(len)) %>%
+    unlist() / 1e6
+
+tot.len.stat <- ld.tab.auto %>%
+    mutate(len = UB - LB) %>%
+    group_by(chr) %>%
+    summarize(len.tot = sum(len))
+
+chr.len.stat <- stat.tab %>%
+    select(chr, ld.idx, LB, UB) %>%
+    unique() %>%
+    mutate(len = UB - LB) %>%
+    group_by(chr) %>%
+    summarize(len = sum(len)) %>%
+    right_join(tot.len.stat) %>%
+    mutate(len = if_else(is.na(len), as.integer(0), len))
+```
+
+We trained our summary-based factored regression models on 1,445 LD
+blocks independently, of which boundaries were approximately estimated 
+[@Berisa2016-cm]
+based on the 1000 genomes project reference panel of Asian population
+[@The_1000_Genomes_Project_Consortium2015-jd]. 
+
+```{r include=FALSE, message=FALSE, warning=FALSE}
+chr.df <- chr.len.stat %>%
+    mutate(unc = len.tot - len) %>%
+    mutate(prop = 100 * (len/len.tot)) %>%
+    gather(key = k, value = v, -chr) %>%
+    mutate(k = factor(k, c('unc', 'len', 'len.tot', 'prop'),
+                      c('uncovered', 'covered', 'total', 'prop')))
+
+genome.mb <- function() {
+    function(x) round(x/1e6)
+}
+
+.df <- chr.df %>% filter(k %in% c('covered', 'uncovered'))
+.aes.txt <- aes(x = chr, y = len.tot, label = round(100 * len/len.tot) %&&% '%')
+
+Fig0 <-
+    gg.plot() +
+    geom_bar(data = .df, stat='identity', aes(x = chr, y = v, fill = k)) +
+    scale_fill_manual('', values = c('gray', 'red')) +
+    geom_text(data = chr.len.stat, .aes.txt, size = 3) +
+    scale_x_discrete(limits = 1:22) +
+    scale_y_continuous('length (Mb)', label = genome.mb())
+```
+
+We identified
+`r trait.tab %>% select(ld.idx, factor) %>% unique() %>% nrow()`
+SNP factors are significantly associated with multiple traits (PIP cutoff 0.9) from
+`r trait.tab %>% select(ld.idx) %>% unique() %>% nrow()` LD blocks,
+spanning over `r round(len.mb)` Mb that corresponds to
+`r round(sum(chr.len.stat$len) / sum(chr.len.stat$len.tot) * 100)`%
+of genome.
+
+```{r fig.width = 6, fig.height = 3}
+print(Fig0)
+dir.create('results_bbj', recursive = TRUE, showWarnings = FALSE)
+ggsave('results_bbj/Fig0.pdf', plot = Fig0, width = 6, height = 3, units = 'in', useDingbats = FALSE)
+```
+
+We then clustered these factors into
+`r unique(trait.tab$cluster) %>% length()` clusters according to the
+similarity of multi-trait activities (log-odds ratio).
+
+```{r include=FALSE, message=FALSE, warning=FALSE}
+## Order traits
+C <- trait.tab %>%
+    group_by(cluster, trait) %>%
+    summarize(pip = mean(pip)) %>%
+    spread(key = trait, value = pip) %>%
+    arrange(cluster)
+
+to <- apply(C[, -1], 2, which.max) %>% order(decreasing = TRUE)
+
+to.tab <- data.frame(Code = colnames(C)[-1][to]) %>%
+    left_join(trait.code)
+
+trait.sorted.tab <- trait.tab %>%
+    rename(Code = trait) %>%
+    left_join(to.tab) %>%
+    mutate(Trait = factor(Trait, to.tab$Trait))
+
+## Order categories
+C <- trait.sorted.tab %>%
+    group_by(cluster, Category) %>%
+    summarize(pip = mean(pip)) %>%
+    spread(key = Category, value = pip, fill = 0) %>%
+    arrange(cluster)
+
+ko <- apply(C[, -1], 2, which.max) %>% order()
+ko.names <- colnames(C)[-1][ko]
+
+trait.sorted.tab <- trait.sorted.tab %>%
+    mutate(Category = factor(Category, ko.names))
+
+.aes <- aes(x = col, y = Trait, fill = pip)
+
+.thm <- theme(axis.text.x = element_blank(),
+              axis.title = element_blank(),
+              panel.spacing = unit(0.1, 'lines'),
+              axis.text.y = element_text(size = 5),
+              strip.text = element_text(size = 5),
+              strip.background = element_blank(),
+              legend.position = 'bottom',
+              legend.title = element_text(size = 4),
+              legend.text = element_text(size = 3),
+              legend.key.size = unit(0.5, 'lines'))
+
+p1 <- gg.plot(trait.sorted.tab, .aes) + .thm +
+    theme(axis.ticks.x = element_blank()) +
+    xlab('genomic factors') + ylab('traits') +
+    geom_tile(color = 'gray') +
+    scale_x_discrete(position = 'top') +
+    facet_grid(Category~cluster, space = 'free', scales = 'free', switch = 'x') +
+    scale_fill_gradientn('PIP', colors = c('#FFFFFF', '#FF0000'),
+                         breaks = c(0, .25, .5, .75, .99, 1))
+
+p2 <- gg.plot(snp.stat, aes(x = col, y = n.snps)) +
+    theme_classic() +
+    ylab('#SNPs') +
+    geom_bar(stat = 'identity') +
+    facet_grid(.~cluster, space = 'free', scales = 'free') +
+    .thm
+
+g.list <- match.widths(list(p2, p1))
+```
+
+```{r fig1, include=TRUE, message=FALSE, warning=FALSE, fig.width = 10, fig.height = 8}
+Fig1 <- grid.arrange(grobs = g.list, ncol = 1, heights = c(1,4), newpage = TRUE)
+dir.create('results_bbj', recursive = TRUE, showWarnings = FALSE)
+ggsave('results_bbj/Fig1.pdf', plot = Fig1, width = 10, height = 8, units = 'in', useDingbats = FALSE)
+```
+
+```{r include=FALSE, message=FALSE, warning=FALSE}
+gwas.aes <- aes(x = col, y = Trait, fill = gwas.6)
+Fig2 <- gg.plot(trait.sorted.tab, gwas.aes) + .thm +
+    theme(axis.ticks.x = element_blank()) +
+    geom_tile(color = 'gray') + 
+    facet_grid(Category~cluster, space = 'free', scales = 'free', switch = 'x') +
+    scale_fill_gradientn('#SNP\np < 1e-6',
+                         colors = c('#FFFFFF', '#FFAA00', '#FF0000'),
+                         breaks = c(1, 10, 100, 1000),
+                         trans = 'log10', na.value = '#FFFFFF')
+
+dir.create('results_bbj', recursive = TRUE, showWarnings = FALSE)
+ggsave('results_bbj/Fig2.pdf', plot = Fig2, width = 10, height = 5, units = 'in', useDingbats = FALSE)
+
+## resid.aes <- aes(x = col, y = trait, fill = resid.6)
+## Fig3 <- gg.plot(trait.sorted.tab, resid.aes) + .thm +
+##     theme(axis.ticks.x = element_blank()) +
+##     geom_tile(color = 'gray') + 
+##     facet_grid(.~cluster, space = 'free', scales = 'free', switch = 'x') +
+##     scale_fill_gradientn('#SNP\np < 1e-6',
+##                          colors = c('#FFFFFF', '#FFAA00', '#FF0000'),
+##                          breaks = c(1, 10, 100),
+##                          trans = 'log10', na.value = '#FFFFFF')
+```	
+	
+```{r fig2, include=TRUE, message=FALSE, warning=FALSE, fig.width = 10, fig.height = 5}
+print(Fig2)
+```
